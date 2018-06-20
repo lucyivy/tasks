@@ -4,6 +4,7 @@ import com.crud.tasks.domain.TrelloBoardDto;
 import com.crud.tasks.domain.*;
 import com.crud.tasks.trello.config.TrelloConfig;
 import lombok.AllArgsConstructor;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.slf4j.LoggerFactory;
 
@@ -22,7 +23,7 @@ import org.slf4j.Logger;
 import static java.util.Optional.ofNullable;
 
 @Component
-@NoArgsConstructor
+@Getter
 @AllArgsConstructor
 public class TrelloClient {
     private static final Logger LOGGER = LoggerFactory.getLogger(TrelloClient.class);
@@ -33,7 +34,7 @@ public class TrelloClient {
     @Autowired
     private RestTemplate restTemplate;
 
-    private URI buildURL() {
+    public URI buildURL() {
         URI url = UriComponentsBuilder.fromHttpUrl(trelloConfig.getTrelloApiEndpoint() + "/members/" + trelloConfig.getTrelloUsername() + "/boards")
                 .queryParam("key", trelloConfig.getTrelloAppKey())
                 .queryParam("token", trelloConfig.getTrelloToken())

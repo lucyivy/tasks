@@ -6,11 +6,8 @@ import lombok.NoArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import javax.persistence.GeneratedValue;
-
 @Component
 @Getter
-@NoArgsConstructor
 @AllArgsConstructor
 public class TrelloConfig {
     @Value("${trello.api.endpoint.prod}")

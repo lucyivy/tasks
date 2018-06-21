@@ -4,114 +4,129 @@ import com.crud.tasks.domain.Task;
 import com.crud.tasks.domain.TaskDto;
 import com.crud.tasks.mapper.TaskMapper;
 import com.crud.tasks.service.DbService;
-import org.junit.Assert;
+import com.google.gson.Gson;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.Mockito;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.ArgumentMatchers;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.junit4.SpringRunner;
+import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@RunWith(MockitoJUnitRunner.class)
+@RunWith(SpringRunner.class)
+@WebMvcTest(TaskController.class)
 public class TasksControllerTestSuite {
+    @Autowired
+    private MockMvc mockMvc;
 
-    @InjectMocks
-    private TaskController controller;
-
-    @Mock
-    private DbService service;
-
-    @Mock
+    @MockBean
     private TaskMapper mapper;
 
+    @MockBean
+    private DbService dbService;
 
     @Test
-    public void testCreateTask() {
+    public void shouldGetTasks() throws Exception {
         //Given
-        TaskDto taskDto = new TaskDto(1L, "Title", "Content");
+        List<TaskDto> taskList = new ArrayList<>();
+        taskList.add(new TaskDto(1L, "title", "content"));
 
-        //When
-        controller.createTask(taskDto);
+        when(mapper.mapToTaskDtoList(dbService.getAllTasks())).thenReturn(taskList);
 
-        //Then
-        Mockito.verify(service, times(1)).saveTask(Mockito.any());
+        //When&Then
+        mockMvc.perform(get("/v1/task/getTasks").contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].id", is(1)))
+                .andExpect(jsonPath("$[0].title", is("title")))
+                .andExpect(jsonPath("$[0].content", is("content")));
     }
 
     @Test
-    public void testGetTasks() {
+    public void shouldGetTask() throws Exception {
         //Given
-        TaskDto taskDto = new TaskDto(1L, "Title", "Content");
-        List<TaskDto> taskDtoList = new ArrayList<>();
-        List<Task> taskList = new ArrayList<>();
-        Task task = new Task(1L, "Title", "Content");
-        taskDtoList.add(taskDto);
-        taskList.add(task);
-        when(service.getAllTasks()).thenReturn(taskList);
-        when(mapper.mapToTaskDtoList(Mockito.anyList())).thenReturn(taskDtoList);
+        List<TaskDto> taskList = new ArrayList<>();
+        taskList.add(new TaskDto(1L, "title", "content"));
+        taskList.add(new TaskDto(2L, "title2", "content2"));
+        Task task = new Task(1L, "title", "content");
 
-        //When
-        List<TaskDto> resultList = controller.getTasks();
+        when(dbService.getTask(1L)).thenReturn(Optional.ofNullable(task));
+        when(mapper.mapToTaskDto(ArgumentMatchers.any())).thenReturn(taskList.get((int) (0)));
 
-        //Then
-        Assert.assertEquals(1, resultList.size());
-        Assert.assertEquals("Title", resultList.get(0).getTitle());
+        //When&Then
+        mockMvc.perform(get("/v1/task/getTask").contentType(MediaType.APPLICATION_JSON).param("taskId", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id", is(1)))
+                .andExpect(jsonPath("$.title", is("title")))
+                .andExpect(jsonPath("$.content", is("content")));
     }
 
     @Test
-    public void testGetTask() {
-        //Given
-        TaskDto taskDto = new TaskDto(1L, "Title", "Content");
-        Task task = new Task(1L, "Title", "Content");
-        when(mapper.mapToTaskDto(Mockito.any())).thenReturn(taskDto);
-        when(service.getTask(1L)).thenReturn(Optional.of(task));
+    public void shoudDeleteTask() throws Exception {
+
 
         //When
-        TaskDto resultDto = new TaskDto();
-        try {
-            resultDto = controller.getTask(1L);
-        } catch (Exception ex) {
-            System.out.println(ex.getMessage());
-        }
-
+        mockMvc.perform(delete("/v1/task/deleteTask").contentType(MediaType.APPLICATION_JSON).param("taskId", "1"))
+                .andExpect(status().is(200));
 
         //Then
-        Assert.assertEquals(resultDto.getId(), 1L, 0.1);
-        Assert.assertEquals("Title", resultDto.getTitle());
-        Assert.assertEquals("Content", resultDto.getContent());
+        verify(dbService, times(1)).deleteTask(ArgumentMatchers.any());
     }
 
     @Test
-    public void testUpdateTask() {
+    public void shouldUpdateTask() throws Exception {
         //Given
-        TaskDto taskDto = new TaskDto(1L, "Title", "Content");
-        Task task = new Task(1L, "Title", "Content");
-        when(mapper.mapToTaskDto(Mockito.any())).thenReturn(taskDto);
+        List<TaskDto> taskList = new ArrayList<>();
+        taskList.add(new TaskDto(1L, "title", "content"));
+        taskList.add(new TaskDto(2L, "title2", "content2"));
 
-        //When
-        TaskDto resultDto = controller.updateTask(taskDto);
 
-        //Then
-        Assert.assertEquals(resultDto.getId(), 1L, 0.1);
-        Assert.assertEquals("Title", resultDto.getTitle());
-        Assert.assertEquals("Content", resultDto.getContent());
+        when(mapper.mapToTaskDto(dbService.saveTask(mapper.mapToTask(taskList.get(0))))).thenReturn(taskList.get(0));
+        Gson gson = new Gson();
+        String jsonContent = gson.toJson(taskList.get(0));
+
+        //When&Then
+        mockMvc.perform(put("/v1/task/updateTask")
+                .contentType(MediaType.APPLICATION_JSON)
+                .characterEncoding("UTF-8")
+                .content(jsonContent))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id", is(1)))
+                .andExpect(jsonPath("$.title", is("title")))
+                .andExpect(jsonPath("$.content", is("content")));
     }
 
     @Test
-    public void testDeleteTask() {
+    public void shouldCreateTask() throws Exception {
         //Given
-        TaskDto taskDto = new TaskDto(1L, "Title", "Content");
+        List<TaskDto> taskList = new ArrayList<>();
+        taskList.add(new TaskDto(1L, "title", "content"));
+        taskList.add(new TaskDto(2L, "title2", "content2"));
 
-        //When
-        controller.deleteTask(1L);
+        Gson gson = new Gson();
+        String jsonContent = gson.toJson(taskList.get(0));
 
-        //Then
-        Mockito.verify(service, times(1)).deleteTask(Mockito.any());
+        //When&Then
+        mockMvc.perform(post("/v1/task/createTask")
+                .contentType(MediaType.APPLICATION_JSON)
+                .characterEncoding("UTF-8")
+                .content(jsonContent))
+                .andExpect(status().isOk());
+        verify(dbService, times(1)).saveTask(ArgumentMatchers.any());
     }
 }
